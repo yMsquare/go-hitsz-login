@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	chromedp "github.com/chromedp/chromedp"
@@ -77,42 +78,46 @@ func main() {
 		if _, ok := err.(*AlreadyLoginError); ok {
 			fmt.Println(i18n["already_login"])
 			fmt.Println(`login user:`, err.(*AlreadyLoginError).LoginUserID)
-
+		
 			logoutPrompt := promptui.Prompt{
 				Label: i18n["logout_confirm"],
-				Validate: func(input string) error {
-					if input == "yes" {
-
-						chromedp.Run(ctx,
-							chromedp.Click(`#logout`, chromedp.ByID),
-							chromedp.WaitVisible(`button.btn-confirm`, chromedp.ByQuery), // 等待按钮出现
-							chromedp.Click(`button.btn-confirm`, chromedp.ByQuery),       // 点击按钮
-							chromedp.Sleep(4*time.Second), // 等待弹窗出现
-						)
-						var successVisible bool
-						err := chromedp.Run(ctx,
-							chromedp.Evaluate(`!!document.querySelector(".alert.alert-success")`, &successVisible),
-						)
-						
-						if err != nil {
-							fmt.Println("检查注销状态失败:", err)
-						} else if successVisible {
-							fmt.Println("✅ 注销成功！")
-						} else {
-							fmt.Println("❌ 未检测到注销成功提示！")
-						}
-						return nil
-					}
-					return fmt.Errorf(i18n["logout_confirm_error"])
-				},
 			}
-
-			_, err := logoutPrompt.Run()
+		
+			input, err := logoutPrompt.Run()
 			if err != nil {
 				fmt.Println("Prompt failed")
 				return
 			}
-			fmt.Println(i18n["login_failed"], err)
+		
+			input = strings.ToLower(strings.TrimSpace(input))
+			if input == "yes" {
+				// 执行注销逻辑
+				chromedp.Run(ctx,
+					chromedp.Click(`#logout`, chromedp.ByID),
+					chromedp.WaitVisible(`button.btn-confirm`, chromedp.ByQuery), // 等待按钮出现
+					chromedp.Sleep(1*time.Second),                                // 等待弹窗出现
+					chromedp.ActionFunc(func(ctx context.Context) error {
+						return SaveScreenshot(ctx, "cdp.png")
+					}),	
+					chromedp.Click(`button.btn-confirm`, chromedp.ByQuery),       // 点击按钮
+					chromedp.Sleep(3*time.Second),                                // 等待弹窗出现
+				)
+				var successVisible bool
+				err := chromedp.Run(ctx,
+					chromedp.Evaluate(`!!document.querySelector(".alert.alert-success")`, &successVisible),
+				)
+		
+				if err != nil {
+					fmt.Println("检查注销状态失败:", err)
+				} else if successVisible {
+					fmt.Println("✅ 注销成功！")
+				} else {
+					fmt.Println("❌ 未检测到注销成功提示！")
+				}
+			} else if input == "no" || input == "n" {
+				fmt.Println("取消注销")
+			}
+			fmt.Println(`Bye`)
 			return
 		}
 	}
