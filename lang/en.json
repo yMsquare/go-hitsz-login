@@ -4,6 +4,8 @@
     "enter_password": "Please enter your password. Don't worry, your password will not be stored",
     "login_success": "✅ Successfully Logged In! 🎉",
     "login_failed": "❌ Login failed! ",
+    "logout_confirm": "❓ Would you like to logout? yes/no",
+    "login_failed_password": "❌ Login failed! Account or password is incorrect",
     "already_login": "✅ Already login! Enjoy! ☺️",
     "error_occurred": "Error occurred: %v"
 }
