@@ -1,0 +1,9 @@
+{
+    "choose_language": "Choose Language",
+    "enter_account": "Please enter your account ID",
+    "enter_password": "Please enter your password. Don't worry, your password will not be stored",
+    "login_success": "✅ Successfully Logged In! 🎉",
+    "login_failed": "❌ Login failed! ",
+    "already_login": "✅ Already login! Enjoy! ☺️",
+    "error_occurred": "Error occurred: %v"
+}
