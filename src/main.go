@@ -62,7 +62,7 @@ func main() {
 	defer cancel()
 	err = chromedp.Run(ctx,
 		chromedp.Navigate("http://10.248.98.2/srun_portal_pc?ac_id=1&theme=basic4"),
-		fmt.Println(`now navigating to login page...`)
+		// fmt.Println(`now navigating to login page...`)
 		// chromedp.ActionFunc(func(ctx context.Context) error {
 			// return SaveScreenshot(ctx, "00-navigate.png")
 		// }),
@@ -83,7 +83,7 @@ func main() {
 		chromedp.Click(`button.btn.btn-account`, chromedp.ByQuery), 
 		
 		chromedp.WaitVisible(`#username`, chromedp.ByID),
-		fmt.Println(`now entering accountID and password...`)
+		// fmt.Println(`now entering accountID and password...`)
 		// chromedp.ActionFunc(func(ctx context.Context) error {
 		// 	return SaveScreenshot(ctx, "01-login-form.png")
 		// }),
