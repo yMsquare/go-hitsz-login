@@ -8,13 +8,22 @@ import (
 type PromptHandler struct{
 	Label string 
 	Items []string
+	Mask rune
 }
+
+type Option func(*PromptHandler)
+
 // NewPromptHandler 创建一个新的 PromptHandler 实例
-func NewPromptHandler(label string ,items []string ) *PromptHandler {
-	return &PromptHandler{
+func NewPromptHandler(label string ,items []string, option...Option ) *PromptHandler {
+	handler := &PromptHandler{
 		Label:  label,
 		Items:  items,
+		Mask:  0,
 	}
+	for _, opt := range option { 
+		opt(handler) 
+	}
+	return handler
 }
 
 func (p *PromptHandler) Select() (string, error ){
@@ -33,10 +42,11 @@ func (p *PromptHandler) Select() (string, error ){
 }
 
 // Input 获取用户输入
-func (p *PromptHandler) Input(validateFunc promptui.ValidateFunc) (string, error) {
+func (p *PromptHandler) Input() (string, error) {
 	prompt := promptui.Prompt{
 		Label:    p.Label,
-		Validate: validateFunc,
+		Mask:	  p.Mask,
+		// Validate: validateFunc,
 	}
 
 	result, err := prompt.Run()
@@ -45,6 +55,12 @@ func (p *PromptHandler) Input(validateFunc promptui.ValidateFunc) (string, error
 	}
 
 	return result, nil
+}
+
+func WithMask(mask rune) Option {
+	return func(s *PromptHandler){
+		s.Mask = mask
+	}
 }
 
 // Confirm 获取用户确认

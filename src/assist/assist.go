@@ -7,7 +7,6 @@ import (
 	chromedp "github.com/chromedp/chromedp"
 )
 
-
 func ChromedpGetContent(url string ) string {
 	ctx, cancel := chromedp.NewContext(context.Background(),chromedp.WithLogf(log.Printf))
 	defer cancel()

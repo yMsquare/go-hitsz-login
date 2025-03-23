@@ -20,4 +20,3 @@ func loadLanguage(lang string ) error {
 	}
 	return nil
 }
-

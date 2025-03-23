@@ -21,34 +21,30 @@ func (e *AlreadyLoginError) Error() string {
 
 func main() {
 
-	langPrompt := promptui.Select{
-		Label: "Choose Language / 选择语言",
-		Items: []string{"English", "中文"},
-	}
-	_, lang, err := langPrompt.Run()
-	if err != nil {
-		fmt.Println("Prompt failed")
-		return
-	}
+	lang, err := NewPromptHandler("Choose Language / 选择语言", []string{"English", "中文"}).Select()
+
 	// 加载用户选择的语言包
 	langCode := "en" // 默认语言
 	if lang == "中文" {
 		langCode = "zh"
 	}
-
 	err = loadLanguage(langCode)
 	if err != nil {
 		fmt.Println("Error loading language:", err)
 		return
 	}
 
+	// 使用 chromedp 开启浏览器
 	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
 	err = chromedp.Run(ctx,
 		chromedp.Navigate("http://10.248.98.2/srun_portal_pc?ac_id=1&theme=basic4"),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			fmt.Println(`now navigating to login page...`)
-			return SaveScreenshot(ctx, "00-navigate.png")
+			fmt.Println(i18n["navigate_page"])
+			// return SaveScreenshot(ctx, "00-navigate.png")
+			return nil
 		}),
+		chromedp.WaitVisible(`h3.title`, chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var exists bool
 			err := chromedp.Evaluate(`!!document.querySelector("#ipv4")`, &exists).Do(ctx)
@@ -64,7 +60,7 @@ func main() {
 					return usernameInput ? usernameInput.textContent: "unknown_user";
 				})();
 			`, &loginUserID).Do(ctx)
-
+				fmt.Println(`login user id:`, loginUserID)
 				if err != nil {
 					fmt.Println(`error getting login user id:`, err)
 					return err
@@ -78,93 +74,104 @@ func main() {
 		if _, ok := err.(*AlreadyLoginError); ok {
 			fmt.Println(i18n["already_login"])
 			fmt.Println(`login user:`, err.(*AlreadyLoginError).LoginUserID)
-		
+
 			logoutPrompt := promptui.Prompt{
 				Label: i18n["logout_confirm"],
 			}
-		
+
 			input, err := logoutPrompt.Run()
 			if err != nil {
 				fmt.Println("Prompt failed")
 				return
 			}
-		
+
 			input = strings.ToLower(strings.TrimSpace(input))
 			if input == "yes" {
 				// 执行注销逻辑
+				fmt.Println(i18n["check_logout"])
 				chromedp.Run(ctx,
 					chromedp.Click(`#logout`, chromedp.ByID),
 					chromedp.WaitVisible(`button.btn-confirm`, chromedp.ByQuery), // 等待按钮出现
 					chromedp.Sleep(1*time.Second),                                // 等待弹窗出现
 					chromedp.ActionFunc(func(ctx context.Context) error {
 						return SaveScreenshot(ctx, "cdp.png")
-					}),	
-					chromedp.Click(`button.btn-confirm`, chromedp.ByQuery),       // 点击按钮
-					chromedp.Sleep(3*time.Second),                                // 等待弹窗出现
+					}),
+					chromedp.Click(`button.btn-confirm`, chromedp.ByQuery), // 点击按钮
+					chromedp.Sleep(3*time.Second),                          // 等待弹窗出现
 				)
 				var successVisible bool
 				err := chromedp.Run(ctx,
 					chromedp.Evaluate(`!!document.querySelector(".alert.alert-success")`, &successVisible),
 				)
-		
+
 				if err != nil {
-					fmt.Println("检查注销状态失败:", err)
+					fmt.Println(i18n["logout_failed"], err)
 				} else if successVisible {
-					fmt.Println("✅ 注销成功！")
+					fmt.Println(i18n["logout_success"])
 				} else {
-					fmt.Println("❌ 未检测到注销成功提示！")
+					fmt.Println(i18n["logout_unknown"])
 				}
 			} else if input == "no" || input == "n" {
-				fmt.Println("取消注销")
+				fmt.Println(i18n["no_logout"])
 			}
 			fmt.Println(`Bye`)
 			return
 		}
 	}
 
-	promptAccount := promptui.Prompt{
-		Label: i18n["enter_account"],
-	}
+	loginMethod, err := NewPromptHandler(i18n["login_method"], []string{i18n["local"], i18n["unified"]}).Select()
+	// 检查用户选择的登录方式
 
-	accountID, err := promptAccount.Run()
-	if err != nil {
-		fmt.Println("Prompt failed")
-		return
-	}
+	// username
+	// password
+	// login_submit
 
-	promptPassword := promptui.Prompt{
-		Label: i18n["enter_password"],
-		Mask:  '*',
-	}
-	password, err := promptPassword.Run()
+	accountID, err := NewPromptHandler(i18n["enter_account"], []string{}).Input()
+	password, err := NewPromptHandler(i18n["enter_password"], []string{}, WithMask('*')).Input()
 
-	if err != nil {
-		fmt.Println("Prompt failed")
-		return
-	}
-
-	defer cancel()
 	err = chromedp.Run(ctx,
-		chromedp.Navigate("http://10.248.98.2/srun_portal_pc?ac_id=1&theme=basic4"),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			fmt.Println(`now navigating to login page...`)
-			return SaveScreenshot(ctx, "00-navigate.png")
+			if loginMethod == i18n["unified"] {
+				err = chromedp.Run(ctx,
+					chromedp.WaitVisible(`button.btn.btn-sso`, chromedp.ByQuery), // 等待按钮出现
+					chromedp.Click(`button.btn.btn-sso`, chromedp.ByQuery),       // 等待按钮出现
+					//https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2F10.248.98.2%2Fsrun_portal_sso
+					chromedp.Sleep(1*time.Second),
+				)
+			} else if loginMethod == i18n["local"] {
+				err = chromedp.Run(ctx,
+					chromedp.WaitVisible(`button.btn.btn-account`, chromedp.ByQuery), // 等待按钮出现
+					chromedp.Click(`button.btn.btn-account`, chromedp.ByQuery),
+					chromedp.Sleep(1*time.Second),
+				)
+			}
+			return err
 		}),
-
-		chromedp.WaitVisible(`button.btn.btn-account`, chromedp.ByQuery), // 等待按钮出现
-		chromedp.Click(`button.btn.btn-account`, chromedp.ByQuery),
-
 		chromedp.WaitVisible(`#username`, chromedp.ByID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			fmt.Println(`now entering accountID and password...`)
-			return SaveScreenshot(ctx, "01-login-form.png")
+			// return SaveScreenshot(ctx, "01-login-form.png")
+			return nil
 		}),
 		chromedp.SendKeys(`#username`, accountID),
 		chromedp.SendKeys(`#password`, password),
 
-		chromedp.Click(`#login-account`, chromedp.ByID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			return SaveScreenshot(ctx, "02-fill.png")
+			if loginMethod == i18n["unified"] {
+				err = chromedp.Run(ctx,
+					chromedp.WaitVisible(`#login_submit`, chromedp.ByID), // 等待按钮出现
+					chromedp.Click(`login_submit`, chromedp.ByID),        // 等待按钮出现
+					//https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2F10.248.98.2%2Fsrun_portal_sso
+					chromedp.Sleep(2*time.Second),
+				)
+			} else if loginMethod == i18n["local"] {
+				err = chromedp.Run(ctx,
+					chromedp.WaitVisible(`#login-account`, chromedp.ByID), // 等待按钮出现
+					chromedp.Click(`#login-account`, chromedp.ByID),
+					chromedp.Sleep(2*time.Second),
+				)
+			}
+			return err
 		}),
 
 		// **检测是否弹出错误提示框**
@@ -194,7 +201,8 @@ func main() {
 
 		chromedp.WaitVisible(`#ipv4`, chromedp.ByID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			return SaveScreenshot(ctx, "03-login.png")
+			// return SaveScreenshot(ctx, "03-login.png")
+			return nil
 		}),
 	)
 	if err != nil {
